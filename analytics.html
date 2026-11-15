@@ -12,7 +12,7 @@
 <section class="panel"><h2>Matching requests</h2><div class="tablewrap"><table><thead><tr><th>Date submitted</th><th>Artist / Group</th><th>Album title</th><th>Year</th><th>Format</th></tr></thead><tbody id="requestRows"></tbody></table></div></section></div>
 <script>
 // Set these to the company's Supabase project URL and public publishable (anon) key.
-const SUPABASE_URL='https://YOUR_PROJECT_REF.supabase.co';const SUPABASE_ANON_KEY='YOUR_SUPABASE_PUBLISHABLE_KEY';
+const SUPABASE_URL='https://wnlfiydqmzwbgboaepjy.supabase.co';const SUPABASE_ANON_KEY='sb_publishable_8w2tTl9Cw4-ARtg1q6mrHA_u8QDqTQV';
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const $=id=>document.getElementById(id);let records=[];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function showSession(session){$('loginView').classList.toggle('hidden',!!session);$('appView').classList.toggle('hidden',!session);if(session){$('userLabel').textContent=session.user.email||'';await loadData()}}
