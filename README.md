@@ -1,8 +1,8 @@
 # Public Wanted List and Store Demand Analytics
 
-An independent, brand-neutral tool for a record store. Customers can anonymously submit wanted Album or CD releases. Company staff sign in to a private dashboard with demand counts, popular releases and artists, release-year and monthly trends, filters, and CSV export. Customer submissions are not shown publicly.
+An independent, brand-neutral tool for a record store. Customers can anonymously submit wanted Album or CD releases. Company staff sign in to a private dashboard with separate Analytics and Wanted List tabs. The Wanted List groups matching artist, title, year, and format, shows request counts, and lets staff mark requests fulfilled. Fulfilled requests remain stored and included in analytics but are hidden from the Wanted List by default. The Analytics tab shows popular artists, release-year and monthly trends, filters, and CSV export. Customer submissions are not shown publicly.
 
-This version does not require CAPTCHA. A hidden honeypot and server-side validation discourage simple automated submissions, but they cannot block all spam. Review unusual demand before using it to guide purchasing.
+This version uses no CAPTCHA and no Edge Function. The public webpage inserts directly into Supabase under a restricted row-level security policy. A hidden honeypot can catch simple form bots, but it cannot stop direct API spam. Review unusual demand before using it to guide purchasing.
 
 ## Data captured
 
@@ -11,15 +11,32 @@ This version does not require CAPTCHA. A hidden honeypot and server-side validat
 - Artist or group
 - Album title
 - Submission timestamp (automatic)
+- Fulfilled flag (company staff only; does not delete request data)
 
 No customer name, email, or other personal information is collected. “Album Name” is represented as **Artist or group**, alongside **Album title**.
 
-## Setup
+## Set up Supabase
 
-1. Create a dedicated Supabase project for the company.
-2. In Supabase **SQL Editor**, run `wanted-list.sql`.
-3. Create company staff accounts in **Authentication → Users**. Disable public signup in Supabase Auth settings; the analytics page has sign-in only.
-4. Authorize each analyst. Run this SQL once per staff account, replacing the email with the exact account email:
+1. In the company's Supabase project, open **SQL Editor → New query**.
+2. For a new setup, paste all of `wanted-list.sql` and click **Run**.
+3. If the app is already installed, run this migration once to add fulfillment tracking and allow authorized staff to update it:
+
+   ```sql
+   alter table public.wanted_items
+     add column if not exists fulfilled boolean not null default false;
+
+   grant update (fulfilled) on public.wanted_items to authenticated;
+
+   drop policy if exists "Analysts can update fulfillment" on public.wanted_items;
+   create policy "Analysts can update fulfillment"
+     on public.wanted_items for update
+     to authenticated
+     using ((select public.is_wanted_analyst()))
+     with check ((select public.is_wanted_analyst()));
+   ```
+
+4. In **Authentication → Users**, create an email-and-password account for each administrator. Disable public signup in Supabase Auth settings. The Wanted List dashboard uses this Supabase Auth account; your GitHub sign-in for the Supabase Dashboard is separate.
+5. Authorize each administrator by running this SQL for the exact account email:
 
    ```sql
    insert into public.wanted_analysts (user_id, email)
@@ -27,21 +44,13 @@ No customer name, email, or other personal information is collected. “Album Na
    on conflict (user_id) do update set email = excluded.email;
    ```
 
-5. Set the company Supabase project URL and public publishable/anon key in both `index.html` and `analytics.html`.
-6. From the unzipped `wanted-list` folder, deploy the public submission function using the Supabase CLI:
+6. Host `index.html` for customer submissions and `analytics.html` for staff. The customer page links to the administrator dashboard. Supabase stores the data; these HTML files need a web host.
+7. At the dashboard login, use the same email and password from the administrator account. Only accounts listed in `wanted_analysts` can view request data and update fulfillment status.
 
-   ```sh
-   npx supabase login
-   npx supabase link --project-ref YOUR_PROJECT_REF
-   npx supabase functions deploy submit-wanted --no-verify-jwt
-   ```
+## Access and data handling
 
-   Supabase supplies the service-role key to the Edge Function automatically; do not add it to the webpages.
-7. Host `index.html` as the public customer form and `analytics.html` for staff. Supabase Row Level Security protects the analytics data even if the dashboard URL is known.
-
-## Access controls
-
-- Public visitors can submit release details through the Edge Function.
-- Public visitors cannot list or read submitted requests.
-- Authenticated users can read requests only when their account is listed in `wanted_analysts`.
-- Direct browser inserts are denied. The Edge Function validates submission fields and ignores requests that fill the hidden honeypot field.
+- Public customers can submit requests but cannot list or read wanted items.
+- Only authenticated analysts can read requests and update the `fulfilled` flag.
+- Marking a grouped release fulfilled updates its existing submission rows. It does not delete them.
+- Analytics continues to include fulfilled requests. The Wanted List hides fulfilled releases by default; use **Show fulfilled items** to review or unmark them.
+- Direct anonymous inserts are enabled so the page does not need an Edge Function. Because this endpoint is public, automated submissions may still get through despite the hidden honeypot.
