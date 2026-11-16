@@ -22,13 +22,12 @@ create index if not exists wanted_items_artist_title_idx on public.wanted_items 
 
 alter table public.wanted_analysts enable row level security;
 alter table public.wanted_items enable row level security;
-revoke all on public.wanted_analysts from anon, authenticated;
-revoke all on public.wanted_items from anon, authenticated;
+revoke all on public.wanted_analysts from public, anon, authenticated;
+revoke all on public.wanted_items from public, anon, authenticated;
 grant select on public.wanted_items to authenticated;
 grant update (fulfilled) on public.wanted_items to authenticated;
--- Allow anonymous customers to submit only the four form fields. IDs and timestamps
--- remain database-generated, and public read access stays disabled.
-grant insert (release_year, format, album_title, artist_name) on public.wanted_items to anon;
+-- Public writes are limited to the database function below, not table INSERT grants.
+revoke insert (release_year, format, album_title, artist_name) on table public.wanted_items from public, anon, authenticated;
 
 create or replace function public.is_wanted_analyst()
 returns boolean
@@ -56,13 +55,46 @@ create policy "Analysts can update fulfillment"
   to authenticated
   using ((select public.is_wanted_analyst()))
   with check ((select public.is_wanted_analyst()));
--- Public customers can submit rows but cannot read any submissions. There is no
--- CAPTCHA or Edge Function in this version, so the public insert endpoint can be spammed.
+-- Public visitors cannot insert directly through the table API.
 drop policy if exists "Public can submit wanted items" on public.wanted_items;
-create policy "Public can submit wanted items"
-  on public.wanted_items for insert
-  to anon
-  with check (fulfilled = false);
+
+create or replace function public.submit_public_wanted_item(
+  p_release_year integer,
+  p_format text,
+  p_artist_name text,
+  p_album_title text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_release_year is null or p_release_year < 1900 or p_release_year > 2100 then
+    raise exception 'Release year must be between 1900 and 2100';
+  end if;
+  if p_format is null or p_format not in ('Album', 'CD') then
+    raise exception 'Format must be Album or CD';
+  end if;
+  if pg_catalog.char_length(pg_catalog.btrim(coalesce(p_artist_name, ''))) not between 1 and 180 then
+    raise exception 'Artist or group must be between 1 and 180 characters';
+  end if;
+  if pg_catalog.char_length(pg_catalog.btrim(coalesce(p_album_title, ''))) not between 1 and 180 then
+    raise exception 'Album title must be between 1 and 180 characters';
+  end if;
+
+  insert into public.wanted_items (release_year, format, artist_name, album_title, fulfilled)
+  values (
+    p_release_year::smallint,
+    p_format,
+    pg_catalog.btrim(p_artist_name),
+    pg_catalog.btrim(p_album_title),
+    false
+  );
+end;
+$$;
+revoke all on function public.submit_public_wanted_item(integer, text, text, text) from public, anon, authenticated;
+grant execute on function public.submit_public_wanted_item(integer, text, text, text) to anon, authenticated;
 
 -- After creating company analyst accounts under Authentication > Users,
 -- authorize an exact email using the setup SQL in README.md.
