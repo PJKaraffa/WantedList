@@ -26,6 +26,7 @@ No customer name, email, or other personal information is collected. “Album Na
      add column if not exists fulfilled boolean not null default false;
 
    grant update (fulfilled) on public.wanted_items to authenticated;
+   grant insert (release_year, format, album_title, artist_name) on public.wanted_items to anon;
 
    drop policy if exists "Analysts can update fulfillment" on public.wanted_items;
    create policy "Analysts can update fulfillment"
@@ -34,6 +35,8 @@ No customer name, email, or other personal information is collected. “Album Na
      using ((select public.is_wanted_analyst()))
      with check ((select public.is_wanted_analyst()));
    ```
+
+   If the customer form reports `permission denied for table wanted_items`, run the `column-scoped `GRANT INSERT` statement above and recreate the public insert policy; the public form submits only year, format, artist, and title.
 
 4. In **Authentication → Users**, create an email-and-password account for each administrator. Disable public signup in Supabase Auth settings. The Wanted List dashboard uses this Supabase Auth account; your GitHub sign-in for the Supabase Dashboard is separate.
 5. Authorize each administrator by running this SQL for the exact account email:
