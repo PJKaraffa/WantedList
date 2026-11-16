@@ -62,7 +62,7 @@ drop policy if exists "Public can submit wanted items" on public.wanted_items;
 create policy "Public can submit wanted items"
   on public.wanted_items for insert
   to anon
-  with check (true);
+  with check (fulfilled = false);
 
 -- After creating company analyst accounts under Authentication > Users,
 -- authorize an exact email using the setup SQL in README.md.
