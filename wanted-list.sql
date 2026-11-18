@@ -13,10 +13,16 @@ create table if not exists public.wanted_items (
   album_title text not null check (char_length(trim(album_title)) between 1 and 180),
   artist_name text not null check (char_length(trim(artist_name)) between 1 and 180),
   created_at timestamptz not null default now(),
-  fulfilled boolean not null default false
+  fulfilled boolean not null default false,
+  customer_name text,
+  customer_email text,
+  customer_phone text
 );
 -- Also supports existing installations when this setup script is run again.
 alter table public.wanted_items add column if not exists fulfilled boolean not null default false;
+alter table public.wanted_items add column if not exists customer_name text;
+alter table public.wanted_items add column if not exists customer_email text;
+alter table public.wanted_items add column if not exists customer_phone text;
 create index if not exists wanted_items_created_at_idx on public.wanted_items (created_at desc);
 create index if not exists wanted_items_artist_title_idx on public.wanted_items (artist_name, album_title);
 
@@ -58,17 +64,26 @@ create policy "Analysts can update fulfillment"
 -- Public visitors cannot insert directly through the table API.
 drop policy if exists "Public can submit wanted items" on public.wanted_items;
 
+drop function if exists public.submit_public_wanted_item(integer, text, text, text);
+
 create or replace function public.submit_public_wanted_item(
   p_release_year integer,
   p_format text,
   p_artist_name text,
-  p_album_title text
+  p_album_title text,
+  p_customer_name text,
+  p_customer_email text,
+  p_customer_phone text
 )
 returns void
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $
+declare
+  v_customer_name text := nullif(pg_catalog.btrim(coalesce(p_customer_name, '')), '');
+  v_customer_email text := nullif(pg_catalog.btrim(coalesce(p_customer_email, '')), '');
+  v_customer_phone text := nullif(pg_catalog.btrim(coalesce(p_customer_phone, '')), '');
 begin
   if p_release_year is null or p_release_year < 1900 or p_release_year > 2100 then
     raise exception 'Release year must be between 1900 and 2100';
@@ -83,13 +98,37 @@ begin
     raise exception 'Album title must be between 1 and 180 characters';
   end if;
 
-  insert into public.wanted_items (release_year, format, artist_name, album_title, fulfilled)
+  if v_customer_name is not null and pg_catalog.char_length(v_customer_name) > 160 then
+    raise exception 'Name must be 160 characters or fewer';
+  end if;
+  if v_customer_email is null and v_customer_phone is null then
+    raise exception 'Provide an email address or phone number';
+  end if;
+  if v_customer_email is not null and (pg_catalog.char_length(v_customer_email) > 254 or v_customer_email !~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+
+end;
+$$;
+revoke all on function public.submit_public_wanted_item(integer, text, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.submit_public_wanted_item(integer, text, text, text, text, text, text) to anon, authenticated;
+
+-- After creating company analyst accounts under Authentication > Users,
+-- authorize an exact email using the setup SQL in README.md.
+) then
+    raise exception 'Enter a valid email address';
+  end if;
+  if v_customer_phone is not null and (pg_catalog.char_length(v_customer_phone) > 40 or pg_catalog.char_length(pg_catalog.regexp_replace(v_customer_phone, '[^0-9]', '', 'g')) < 7) then
+    raise exception 'Enter a valid phone number';
+  end if;
+
+  insert into public.wanted_items (release_year, format, artist_name, album_title, fulfilled, customer_name, customer_email, customer_phone)
   values (
     p_release_year::smallint,
     p_format,
     pg_catalog.btrim(p_artist_name),
     pg_catalog.btrim(p_album_title),
-    false
+    false,
+    v_customer_name,
+    v_customer_email,
+    v_customer_phone
   );
 end;
 $$;
