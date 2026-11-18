@@ -38,7 +38,7 @@ Name, email address, and phone number are collected only to follow up about a re
 ## Access and data handling
 
 - Public customers can submit requests through the database function but cannot list or read wanted items or insert directly into the table.
-- Only authenticated analysts can read requests and update the `fulfilled` flag.
+- Only authenticated analysts can read requests, update the `fulfilled` flag, and edit individual requests from the dashboard.
 - Marking a grouped release fulfilled updates its existing submission rows. It does not delete them.
 - Analytics continues to include fulfilled requests. The Wanted List hides fulfilled releases by default; use **Show fulfilled items** to review or unmark them.
 - The database function accepts only release year, format, artist, title, name, email, and phone. Public users cannot provide IDs, timestamps, or fulfillment status. Automated submissions may still get through despite the hidden honeypot.
