@@ -79,7 +79,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_customer_name text := nullif(pg_catalog.btrim(coalesce(p_customer_name, '')), '');
   v_customer_email text := nullif(pg_catalog.btrim(coalesce(p_customer_email, '')), '');
@@ -104,7 +104,24 @@ begin
   if v_customer_email is null and v_customer_phone is null then
     raise exception 'Provide an email address or phone number';
   end if;
-  if v_customer_email is not null and (pg_catalog.char_length(v_customer_email) > 254 or v_customer_email !~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+
+  if v_customer_email is not null and (pg_catalog.char_length(v_customer_email) > 254 or v_customer_email !~* '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$') then
+    raise exception 'Enter a valid email address';
+  end if;
+  if v_customer_phone is not null and (pg_catalog.char_length(v_customer_phone) > 40 or pg_catalog.char_length(pg_catalog.regexp_replace(v_customer_phone, '[^0-9]', '', 'g')) < 7) then
+    raise exception 'Enter a valid phone number';
+  end if;
+
+  insert into public.wanted_items (release_year, format, artist_name, album_title, fulfilled, customer_name, customer_email, customer_phone)
+  values (
+    p_release_year::smallint,
+    p_format,
+    pg_catalog.btrim(p_artist_name),
+    pg_catalog.btrim(p_album_title),
+    false,
+    v_customer_name,
+    v_customer_email,
+    v_customer_phone
+  );
 end;
 $$;
 revoke all on function public.submit_public_wanted_item(integer, text, text, text, text, text, text) from public, anon, authenticated;
