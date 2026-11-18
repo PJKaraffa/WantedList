@@ -127,5 +127,71 @@ $$;
 revoke all on function public.submit_public_wanted_item(integer, text, text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.submit_public_wanted_item(integer, text, text, text, text, text, text) to anon, authenticated;
 
+create or replace function public.update_wanted_request(
+  p_request_id uuid,
+  p_release_year integer,
+  p_format text,
+  p_artist_name text,
+  p_album_title text,
+  p_customer_name text,
+  p_customer_email text,
+  p_customer_phone text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_customer_name text := nullif(pg_catalog.btrim(coalesce(p_customer_name, '')), '');
+  v_customer_email text := nullif(pg_catalog.btrim(coalesce(p_customer_email, '')), '');
+  v_customer_phone text := nullif(pg_catalog.btrim(coalesce(p_customer_phone, '')), '');
+begin
+  if not public.is_wanted_analyst() then
+    raise exception 'Only authorized analysts can edit wanted requests';
+  end if;
+  if p_request_id is null then
+    raise exception 'A request ID is required';
+  end if;
+  if p_release_year is null or p_release_year < 1900 or p_release_year > 2100 then
+    raise exception 'Release year must be between 1900 and 2100';
+  end if;
+  if p_format is null or p_format not in ('Album', 'CD') then
+    raise exception 'Format must be Album or CD';
+  end if;
+  if pg_catalog.char_length(pg_catalog.btrim(coalesce(p_artist_name, ''))) not between 1 and 180 then
+    raise exception 'Artist or group must be between 1 and 180 characters';
+  end if;
+  if pg_catalog.char_length(pg_catalog.btrim(coalesce(p_album_title, ''))) not between 1 and 180 then
+    raise exception 'Album title must be between 1 and 180 characters';
+  end if;
+  if v_customer_name is not null and pg_catalog.char_length(v_customer_name) > 160 then
+    raise exception 'Name must be 160 characters or fewer';
+  end if;
+  if v_customer_email is not null and (pg_catalog.char_length(v_customer_email) > 254 or v_customer_email !~* '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$') then
+    raise exception 'Enter a valid email address';
+  end if;
+  if v_customer_phone is not null and (pg_catalog.char_length(v_customer_phone) > 40 or pg_catalog.char_length(pg_catalog.regexp_replace(v_customer_phone, '[^0-9]', '', 'g')) < 7) then
+    raise exception 'Enter a valid phone number';
+  end if;
+
+  update public.wanted_items
+  set release_year = p_release_year::smallint,
+      format = p_format,
+      artist_name = pg_catalog.btrim(p_artist_name),
+      album_title = pg_catalog.btrim(p_album_title),
+      customer_name = v_customer_name,
+      customer_email = v_customer_email,
+      customer_phone = v_customer_phone
+  where id = p_request_id;
+
+  if not found then
+    raise exception 'Wanted request not found';
+  end if;
+end;
+$$;
+revoke all on function public.update_wanted_request(uuid, integer, text, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.update_wanted_request(uuid, integer, text, text, text, text, text, text) to authenticated;
+
 -- After creating company analyst accounts under Authentication > Users,
 -- authorize an exact email using the setup SQL in README.md.
