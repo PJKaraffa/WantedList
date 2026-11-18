@@ -2,7 +2,7 @@
 
 An independent, brand-neutral tool for a record store. Customers can anonymously submit wanted Album or CD releases. Company staff sign in to a private dashboard with separate Analytics and Wanted List tabs. The Wanted List groups matching artist, title, year, and format, shows request counts, and lets staff mark requests fulfilled. Fulfilled requests remain stored and included in analytics but are hidden from the Wanted List by default. The Analytics tab shows popular artists, release-year and monthly trends, filters, and CSV export. Customer submissions are not shown publicly.
 
-This version uses no CAPTCHA and no Edge Function. The public page submits through a database function that accepts only the four release fields and creates the ID, timestamp, and fulfillment status in the database. A hidden honeypot can catch simple form bots, but public submissions can still be automated. Review unusual demand before using it to guide purchasing.
+This version uses no CAPTCHA and no Edge Function. The public page submits through a database function that accepts release details and customer contact fields, and creates the ID, timestamp, and fulfillment status in the database. A hidden honeypot can catch simple form bots, but public submissions can still be automated. Review unusual demand before using it to guide purchasing.
 
 ## Data captured
 
@@ -10,10 +10,12 @@ This version uses no CAPTCHA and no Edge Function. The public page submits throu
 - Format: Album or CD
 - Artist or group
 - Album title
+- Optional name
+- Email address or phone number (at least one required)
 - Submission timestamp (automatic)
 - Fulfilled flag (company staff only; does not delete request data)
 
-No customer name, email, or other personal information is collected. “Album Name” is represented as **Artist or group**, alongside **Album title**.
+Name, email address, and phone number are collected only to follow up about a request. Name is optional; an email or phone number is required. Only authorized company analysts can read contact details. “Album Name” is represented as **Artist or group**, alongside **Album title**.
 
 ## Set up Supabase
 
@@ -39,4 +41,4 @@ No customer name, email, or other personal information is collected. “Album Na
 - Only authenticated analysts can read requests and update the `fulfilled` flag.
 - Marking a grouped release fulfilled updates its existing submission rows. It does not delete them.
 - Analytics continues to include fulfilled requests. The Wanted List hides fulfilled releases by default; use **Show fulfilled items** to review or unmark them.
-- The database function inserts only release year, format, artist, and title. Public users cannot provide IDs, timestamps, or fulfillment status. Automated submissions may still get through despite the hidden honeypot.
+- The database function accepts only release year, format, artist, title, name, email, and phone. Public users cannot provide IDs, timestamps, or fulfillment status. Automated submissions may still get through despite the hidden honeypot.
