@@ -16,13 +16,15 @@ create table if not exists public.wanted_items (
   fulfilled boolean not null default false,
   customer_name text,
   customer_email text,
-  customer_phone text
+  customer_phone text,
+  email_sent boolean not null default false
 );
 -- Also supports existing installations when this setup script is run again.
 alter table public.wanted_items add column if not exists fulfilled boolean not null default false;
 alter table public.wanted_items add column if not exists customer_name text;
 alter table public.wanted_items add column if not exists customer_email text;
 alter table public.wanted_items add column if not exists customer_phone text;
+alter table public.wanted_items add column if not exists email_sent boolean not null default false;
 create index if not exists wanted_items_created_at_idx on public.wanted_items (created_at desc);
 create index if not exists wanted_items_artist_title_idx on public.wanted_items (artist_name, album_title);
 
@@ -182,7 +184,8 @@ begin
       album_title = pg_catalog.btrim(p_album_title),
       customer_name = v_customer_name,
       customer_email = v_customer_email,
-      customer_phone = v_customer_phone
+      customer_phone = v_customer_phone,
+      email_sent = case when customer_email is distinct from v_customer_email then false else email_sent end
   where id = p_request_id;
 
   if not found then
@@ -192,6 +195,41 @@ end;
 $$;
 revoke all on function public.update_wanted_request(uuid, integer, text, text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.update_wanted_request(uuid, integer, text, text, text, text, text, text) to authenticated;
+
+create or replace function public.set_wanted_request_email_sent(
+  p_request_id uuid,
+  p_email_sent boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_wanted_analyst() then
+    raise exception 'Only authorized analysts can update email status';
+  end if;
+  if p_request_id is null then
+    raise exception 'A request ID is required';
+  end if;
+  if coalesce(p_email_sent, false) and not exists (
+    select 1 from public.wanted_items
+    where id = p_request_id and customer_email is not null
+  ) then
+    raise exception 'This request has no email address';
+  end if;
+
+  update public.wanted_items
+  set email_sent = coalesce(p_email_sent, false)
+  where id = p_request_id;
+
+  if not found then
+    raise exception 'Wanted request not found';
+  end if;
+end;
+$$;
+revoke all on function public.set_wanted_request_email_sent(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.set_wanted_request_email_sent(uuid, boolean) to authenticated;
 
 -- After creating company analyst accounts under Authentication > Users,
 -- authorize an exact email using the setup SQL in README.md.
