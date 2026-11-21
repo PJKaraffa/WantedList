@@ -14,6 +14,7 @@ This version uses no CAPTCHA and no Edge Function. The public page submits throu
 - Email address or phone number (at least one required)
 - Submission timestamp (automatic)
 - Fulfilled flag (company staff only; does not delete request data)
+- Email-sent flag (company staff only; manually checked after sending)
 
 Name, email address, and phone number are collected only to follow up about a request. Name is optional; an email or phone number is required. Only authorized company analysts can read contact details. “Album Name” is represented as **Artist or group**, alongside **Album title**.
 
@@ -38,7 +39,7 @@ Name, email address, and phone number are collected only to follow up about a re
 ## Access and data handling
 
 - Public customers can submit requests through the database function but cannot list or read wanted items or insert directly into the table.
-- Only authenticated analysts can read requests, update the `fulfilled` flag, and edit individual requests from the dashboard.
-- Marking a grouped release fulfilled updates its existing submission rows. It does not delete them.
+- Only authenticated analysts can read requests, update the `fulfilled` and `email_sent` flags, and edit individual requests from the dashboard.
+- Marking a grouped release fulfilled updates its existing submission rows. It does not delete them. After sending an email from the Individual Requests list, check **Emailed** to save the status and highlight the row. The dashboard cannot detect whether a separate email app actually sent the draft.
 - Analytics continues to include fulfilled requests. The Wanted List hides fulfilled releases by default; use **Show fulfilled items** to review or unmark them.
 - The database function accepts only release year, format, artist, title, name, email, and phone. Public users cannot provide IDs, timestamps, or fulfillment status. Automated submissions may still get through despite the hidden honeypot.
